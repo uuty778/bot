@@ -40,14 +40,35 @@ async def handler(ev):
     if not p:
         return
 
-    # 记录当期，用于算下一期
+    # 当期开奖号码
+    om = re.search(r'开(\d+)', text)
+    opened = int(om.group(1)) if om else None
+    tail = opened % 10 if opened is not None else None
+
+    # 上期杀的
+    last_kill = history[-1][3] if (history and len(history[-1]) > 3) else None
+
+    # 判断上期挂没挂：上期杀的 = 本期开的大小单双 → 挂
+    chain_broken = False
+    if last_kill and tail is not None:
+        o_big = tail >= 5
+        o_odd = tail % 2 == 1
+        opened_ss = ("大" if o_big else "小") + ("单" if o_odd else "双")
+        if opened_ss == last_kill:
+            chain_broken = True
+
+    # 记录本期
     history.append((p[0], p[1], p[2]))
-    while len(history) < 3:
-        history.insert(0, (0, 0, 0))
-    if len(history) > 3:
+
+    # 挂了 → 只留最近3期重算（断链）
+    if chain_broken:
         history = history[-3:]
 
-    # 算法：第3期a + 第2期b + 最新期末位
+    # 不足3期补位
+    while len(history) < 3:
+        history.insert(0, (0, 0, 0))
+
+    # 算法：第3期a + 第2期b + 最新期末位 = value
     a3 = history[-3][1]
     b2 = history[-2][2]
     cur = history[-1][0]
@@ -56,12 +77,17 @@ async def handler(ev):
     # value → 大小单双 → 杀相反
     big = val >= 5
     odd = val % 2 == 1
-    kill_ss = ("小" if big else "大") + ("双" if odd else "单")
+    kill_size = "小" if big else "大"
+    kill_parity = "双" if odd else "单"
+    kill_ss = kill_size + kill_parity
 
-    # 发下一期
+    history[-1] = (history[-1][0], history[-1][1], history[-1][2], kill_ss)
+
+    # 发下一期预测
     cur_period = re.search(r'第(\d+)期', text).group(1)
     next_period = str(int(cur_period) + 1)
-    await client.send_message(TARGET, f"第{next_period}期杀{kill_ss}")
+    prefix = "🔄" if chain_broken else ""
+    await client.send_message(TARGET, f"{prefix}第{next_period}期杀{kill_ss}")
 
 client.start()
 client.run_until_disconnected()
