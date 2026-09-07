@@ -8,7 +8,8 @@ session_str = "1BVtsOIQBuw7QWchMeY2sYsPhrP9oLEDQRinT871ThXkDyT5A9LcTV0k_cecG3sgf
 TARGET = "@dd28"
 history = []
 
-bold_map = {'𝟬':'0','𝟭':'1','𝟮':'2','𝟯':'3','𝟰':'4','𝟱':'5','𝟲':'6','𝟳':'7','𝟴':'8','𝟵':'9'}
+bold_map = {'𝟬': '0', '𝟭': '1', '𝟮': '2', '𝟯': '3', '𝟰': '4',
+            '𝟱': '5', '𝟲': '6', '𝟳': '7', '𝟴': '8', '𝟵': '9'}
 
 def unbold(t):
     for k, v in bold_map.items():
@@ -40,31 +41,27 @@ async def handler(ev):
     if not p:
         return
 
-    # 当期开奖号码
+    # 当期开奖
     om = re.search(r'开(\d+)', text)
     opened = int(om.group(1)) if om else None
     tail = opened % 10 if opened is not None else None
 
-    # 上期杀的
-    last_kill = history[-1][3] if (history and len(history[-1]) > 3) else None
-
-    # 判断上期挂没挂：上期杀的 = 本期开的大小单双 → 挂
+    # 上期预测挂没挂（上期杀号 vs 本期开奖）
     chain_broken = False
-    if last_kill and tail is not None:
-        o_big = tail >= 5
-        o_odd = tail % 2 == 1
-        opened_ss = ("大" if o_big else "小") + ("单" if o_odd else "双")
-        if opened_ss == last_kill:
-            chain_broken = True
+    if history and len(history[-1]) > 3:
+        prev_kill = history[-1][3]
+        if tail is not None:
+            o_big = tail >= 5
+            o_odd = tail % 2 == 1
+            opened_ss = ("大" if o_big else "小") + ("单" if o_odd else "双")
+            if opened_ss == prev_kill:
+                chain_broken = True
 
     # 记录本期
     history.append((p[0], p[1], p[2]))
-
-    # 挂了 → 只留最近3期重算（断链）
     if chain_broken:
-        history = history[-3:]
+        history = history[-3:]  # 挂了，只留最近3期重算
 
-    # 不足3期补位
     while len(history) < 3:
         history.insert(0, (0, 0, 0))
 
@@ -77,17 +74,24 @@ async def handler(ev):
     # value → 大小单双 → 杀相反
     big = val >= 5
     odd = val % 2 == 1
-    kill_size = "小" if big else "大"
-    kill_parity = "双" if odd else "单"
-    kill_ss = kill_size + kill_parity
+    kill_ss = ("小" if big else "大") + ("双" if odd else "单")
 
     history[-1] = (history[-1][0], history[-1][1], history[-1][2], kill_ss)
 
-    # 发下一期预测
+    # 发当期完整消息：第X期杀Y🀄/🍉开Z
     cur_period = re.search(r'第(\d+)期', text).group(1)
-    next_period = str(int(cur_period) + 1)
-    prefix = "🔄" if chain_broken else ""
-    await client.send_message(TARGET, f"{prefix}第{next_period}期杀{kill_ss}")
+    if tail is not None and opened is not None:
+        o_big = tail >= 5
+        o_odd = tail % 2 == 1
+        opened_ss = ("大" if o_big else "小") + ("单" if o_odd else "双")
+        hit = opened_ss != kill_ss
+        emoji = "🀄" if hit else "🍉"
+        msg = f"第{cur_period}期杀{kill_ss}{emoji}{opened}"
+    else:
+        msg = f"第{cur_period}期杀{kill_ss}"
 
+    await client.send_message(TARGET, msg)
+
+print("启动中...")
 client.start()
 client.run_until_disconnected()
