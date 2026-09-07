@@ -1,0 +1,7 @@
+name: run
+on: workflow_dispatch
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "done"
