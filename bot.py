@@ -16,75 +16,79 @@ def unbold(t):
         t = t.replace(k, v)
     return t
 
-def parse(t):
-    t = unbold(t)
-    iss = re.search(r'第(\d+)期', t)
-    if not iss:
-        return None
-    last = int(iss.group(1)[-1])
-    sm = re.search(r'(\d)\+(\d)\+(\d)=', t)
-    if not sm:
-        return None
-    return (last, int(sm.group(1)), int(sm.group(2)))
-
 client = TelegramClient(StringSession(session_str), api_id, api_hash)
 
 @client.on(events.NewMessage(chats=TARGET))
-async def handler(ev):
+async def handler(event):
     global history
-    text = ev.message.text
-    p = parse(text)
-    if not p:
+    text = event.message.text
+    if not text:
         return
 
+    text = unbold(text)
+
+    pm = re.search(r'第(\d+)期', text)
+    if not pm:
+        return
+    cur_period = pm.group(1)
+
     om = re.search(r'开(\d+)', text)
-    opened = int(om.group(1)) if om else None
-    tail = opened % 10 if opened is not None else None
+    if not om:
+        return
+    opened = int(om.group(1))
+    tail = opened % 10
 
-    cur_period = re.search(r'第(\d+)期', text).group(1)
+    sm = re.search(r'(\d)\+(\d)\+(\d)=', text)
+    if not sm:
+        return
+    a = int(sm.group(1))
+    b = int(sm.group(2))
+    c = int(sm.group(3))
 
-    # 判断上期挂没挂
+    # 判断上期挂没挂（用上上期杀号 vs 本期开奖）
     hit = True
-    if history:
-        last_kill = history[-1].get('kill')
-        if last_kill and tail is not None:
-            o_big = tail >= 5
-            o_odd = tail % 2 == 1
-            opened_ss = ("大" if o_big else "小") + ("单" if o_odd else "双")
-            if opened_ss == last_kill:
-                hit = False  # 挂了
+    if len(history) >= 2 and len(history[-2]) >= 5:
+        prev_kill = history[-2][4]
+        o_big = tail >= 5
+        o_odd = tail % 2 == 1
+        opened_ss = ("大" if o_big else "小") + ("单" if o_odd else "双")
+        if opened_ss == prev_kill:
+            hit = False
 
-    # 挂了 → 清空重发
+    # 挂了清空
     if not hit:
         history.clear()
 
     # 记录本期
-    history.append({'period': cur_period, 'a': p[0], 'b': p[1], 'c': p[2]})
+    history.append([c, a, b])
+    if len(history) > 3:
+        history = history[-3:]
 
-    # 不足3期补位
     while len(history) < 3:
-        history.insert(0, {'period': '0', 'a': 0, 'b': 0, 'c': 0})
+        history.insert(0, [0, 0, 0])
 
-    # 算法：第3期a + 第2期b + 最新期末位 = value
-    a3 = history[-3]['a']
-    b2 = history[-2]['b']
-    cur = history[-1]['c']
+    # 算法：第3期a + 第2期b + 最新期末位
+    a3 = history[-3][1]
+    b2 = history[-2][2]
+    cur = history[-1][0]
     val = (a3 + b2 + cur) % 10
 
-    big = val >= 5
-    odd = val % 2 == 1
-    kill_ss = ("小" if big else "大") + ("双" if odd else "单")
+    kill_ss = ("小" if val >= 5 else "大") + ("双" if val % 2 == 1 else "单")
 
-    history[-1]['kill'] = kill_ss
+    history[-1].append(kill_ss)
 
-    # 发消息
-    if tail is not None and opened is not None:
-        emoji = "🀄" if hit else "🍉"
-        msg = f"第{cur_period}期杀{kill_ss}{emoji}{opened}"
-    else:
-        msg = f"第{cur_period}期杀{kill_ss}"
+    # 双组
+    shuangzu_map = {
+        "小单": "小双大单",
+        "小双": "小单大双",
+        "大单": "大双小单",
+        "大双": "大单小双"
+    }
+    shuangzu = shuangzu_map.get(kill_ss, "")
 
-    await client.send_message(TARGET, msg)
+    # 发
+    emoji = "🀄" if hit else "🍉"
+    await client.send_message(TARGET, f"第{cur_period}期杀{kill_ss} {shuangzu}{emoji}{opened}")
 
 print("启动中...")
 client.start()
