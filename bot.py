@@ -10,70 +10,44 @@ history = []
 
 bold_map = {'𝟬':'0','𝟭':'1','𝟮':'2','𝟯':'3','𝟰':'4','𝟱':'5','𝟲':'6','𝟳':'7','𝟴':'8','𝟵':'9'}
 
-def unbold(text):
+def unbold(t):
     for k, v in bold_map.items():
-        text = text.replace(k, v)
-    return text
+        t = t.replace(k, v)
+    return t
 
-def parse(text):
-    text = unbold(text)
-    iss = re.search(r'第(\d+)期', text)
+def parse(t):
+    t = unbold(t)
+    iss = re.search(r'第(\d+)期', t)
     if not iss:
         return None
     last = int(iss.group(1)[-1])
-    sm = re.search(r'(\d)\+(\d)\+(\d)=', text)
+    sm = re.search(r'(\d)\+(\d)\+(\d)=', t)
     if not sm:
         return None
     return (last, int(sm.group(1)), int(sm.group(2)))
 
-def opened_tail(text):
-    om = re.search(r'开(\d+)', text)
-    if not om:
-        return None
-    return int(om.group(1)) % 10
-
 client = TelegramClient(StringSession(session_str), api_id, api_hash)
 
 @client.on(events.NewMessage(pattern='/start'))
-async def start(event):
-    await event.respond('自动报数已启动！')
+async def start(ev):
+    await ev.respond('自动报数已启动！')
 
 @client.on(events.NewMessage(chats=TARGET))
-async def handler(event):
+async def handler(ev):
     global history
-    text = event.message.text
+    text = ev.message.text
     p = parse(text)
     if not p:
         return
 
-    tail = opened_tail(text)
-    period = re.search(r'第(\d+)期', text).group(1)
-    opened_num = re.search(r'开(\d+)', text)
-    opened = int(opened_num.group(1)) if opened_num else None
-
-    last_kill = history[-1][3] if (history and len(history) > 0 and len(history[-1]) > 3) else None
-
-    # 判断上期是否挂了
-    chain_broken = False
-    if last_kill and tail is not None:
-        o_big = tail >= 5
-        o_odd = tail % 2 == 1
-        opened_ss = ("大" if o_big else "小") + ("单" if o_odd else "双")
-        if opened_ss == last_kill:
-            chain_broken = True
-
-    # 记录本期
+    # 记录当期，用于算下一期
     history.append((p[0], p[1], p[2]))
-
-    # 挂了 → 只留最近3期重算
-    if chain_broken:
-        history = history[-3:]
-
-    # 不足3期补位（启动就报）
     while len(history) < 3:
         history.insert(0, (0, 0, 0))
+    if len(history) > 3:
+        history = history[-3:]
 
-    # 算法：第3期a + 第2期b + 最新期末位 = value
+    # 算法：第3期a + 第2期b + 最新期末位
     a3 = history[-3][1]
     b2 = history[-2][2]
     cur = history[-1][0]
@@ -82,22 +56,12 @@ async def handler(event):
     # value → 大小单双 → 杀相反
     big = val >= 5
     odd = val % 2 == 1
-    kill_size = "小" if big else "大"
-    kill_parity = "双" if odd else "单"
-    kill_ss = kill_size + kill_parity
+    kill_ss = ("小" if big else "大") + ("双" if odd else "单")
 
-    history[-1] = (history[-1][0], history[-1][1], history[-1][2], kill_ss)
+    # 发下一期
+    cur_period = re.search(r'第(\d+)期', text).group(1)
+    next_period = str(int(cur_period) + 1)
+    await client.send_message(TARGET, f"第{next_period}期杀{kill_ss}")
 
-    # 拼文案
-    if opened is not None:
-        hit = (tail is not None) and (("大" if tail >= 5 else "小") + ("单" if tail % 2 == 1 else "双") == kill_ss)
-        emoji = "🍉" if hit else "🀄"
-        msg = f"第{period}期杀{kill_ss}{emoji}开{opened}"
-    else:
-        msg = f"第{period}期杀{kill_ss}"
-
-    await client.send_message(TARGET, msg)
-
-print("启动中...")
 client.start()
 client.run_until_disconnected()
