@@ -30,6 +30,10 @@ def parse(text):
     except:
         return None
 
+@client.on(events.NewMessage(pattern='/start'))
+async def start(event):
+    await event.respond('自动报数已启动！')
+
 @client.on(events.NewMessage(chats=TARGET))
 async def handler(event):
     global history
@@ -41,13 +45,11 @@ async def handler(event):
         return
     if len(history) > 20:
         history = history[-3:]
-
     a3 = history[-3][1]
     b2 = history[-2][2]
     last = history[-1][0]
     val = (a3 + b2 + last) % 10
     kill = (val + 5) % 10
-
     msg = f"📊 自动报数\nvalue={val}\n🔪 杀={kill}"
     await client.send_message(TARGET, msg)
 
