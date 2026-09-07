@@ -8,6 +8,8 @@ session_str = "1BVtsOIQBuw7QWchMeY2sYsPhrP9oLEDQRinT871ThXkDyT5A9LcTV0k_cecG3sgf
 
 TARGET = "@dd28"
 history = []
+pending_lines = []
+BATCH_SIZE = 10
 
 bold_map = {
     '𝟬': '0', '𝟭': '1', '𝟮': '2', '𝟯': '3', '𝟰': '4',
@@ -26,10 +28,10 @@ def parse(text):
         return None
     num = int(iss.group(1))
     last = int(str(num)[-1])
-    sm = re.search(r'(\d)\+(\d)\+(\d)=', text)
+    sm = re.search(r'(\d)\+(\d)\+(\d)=(\d+)', text)
     if not sm:
         return None
-    return (num, last, int(sm.group(1)), int(sm.group(2)))
+    return (num, last, int(sm.group(1)), int(sm.group(2)), int(sm.group(3)), int(sm.group(4)))
 
 def get_type(n):
     if n <= 4:
@@ -50,7 +52,7 @@ async def start(event):
 
 @client.on(events.NewMessage(chats=TARGET))
 async def handler(event):
-    global history
+    global history, pending_lines
     p = parse(event.message.text)
     if not p:
         return
@@ -64,13 +66,28 @@ async def handler(event):
     b2 = history[-2][3]
     curr_num = history[-1][0]
     curr_last = history[-1][1]
+    curr_sum = history[-1][5]  # 开奖和
 
     val = (a3 + b2 + curr_last) % 10
     杀号 = (10 - val) % 10
     杀型 = get_type(杀号)
 
-    msg = f"第{curr_num + 1}期：杀{杀型}"
-    await client.send_message(TARGET, msg)
+    # 期号转加粗
+    next_num_str = str(curr_num + 1)
+    bold_num = ''
+    for c in next_num_str:
+        for k, v in bold_map.items():
+            if v == c:
+                bold_num += k
+                break
+
+    line = f"第{bold_num}期杀{杀型}🀄️{curr_sum}"
+    pending_lines.append(line)
+
+    if len(pending_lines) >= BATCH_SIZE:
+        msg = '\n'.join(pending_lines)
+        await client.send_message(TARGET, msg)
+        pending_lines = []
 
 print("启动中...")
 client.start()
