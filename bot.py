@@ -9,7 +9,10 @@ session_str = "1BVtsOIQBuw7QWchMeY2sYsPhrP9oLEDQRinT871ThXkDyT5A9LcTV0k_cecG3sgf
 TARGET = "@dd28"
 history = []
 
-bold_map = {'𝟬':'0','𝟭':'1','𝟮':'2','𝟯':'3','𝟰':'4','𝟱':'5','𝟲':'6','𝟳':'7','𝟴':'8','𝟵':'9'}
+bold_map = {
+    '𝟬': '0', '𝟭': '1', '𝟮': '2', '𝟯': '3', '𝟰': '4',
+    '𝟱': '5', '𝟲': '6', '𝟳': '7', '𝟴': '8', '𝟵': '9'
+}
 
 def unbold(text):
     for k, v in bold_map.items():
@@ -21,11 +24,23 @@ def parse(text):
     iss = re.search(r'第(\d+)期', text)
     if not iss:
         return None
-    last = int(iss.group(1)[-1])
+    num = int(iss.group(1))
+    last = int(str(num)[-1])
     sm = re.search(r'(\d)\+(\d)\+(\d)=', text)
     if not sm:
         return None
-    return (last, int(sm.group(1)), int(sm.group(2)))
+    return (num, last, int(sm.group(1)), int(sm.group(2)))
+
+def get_type(n):
+    if n <= 4:
+        size = '小'
+    else:
+        size = '大'
+    if n % 2 == 0:
+        parity = '双'
+    else:
+        parity = '单'
+    return size + parity
 
 client = TelegramClient(StringSession(session_str), api_id, api_hash)
 
@@ -40,16 +55,21 @@ async def handler(event):
     if not p:
         return
     history.append(p)
-    if len(history) < 3:
+    if len(history) < 4:
         return
     if len(history) > 20:
-        history = history[-3:]
-    a3 = history[-3][1]
-    b2 = history[-2][2]
-    last = history[-1][0]
-    val = (a3 + b2 + last) % 10
-    kill = (val + 5) % 10
-    msg = "📊 自动报数\nvalue=" + str(val) + "\n🔪 杀=" + str(kill)
+        history = history[-4:]
+
+    a3 = history[-3][2]
+    b2 = history[-2][3]
+    curr_num = history[-1][0]
+    curr_last = history[-1][1]
+
+    val = (a3 + b2 + curr_last) % 10
+    杀号 = (10 - val) % 10
+    杀型 = get_type(杀号)
+
+    msg = f"第{curr_num + 1}期：杀{杀型}"
     await client.send_message(TARGET, msg)
 
 print("启动中...")
