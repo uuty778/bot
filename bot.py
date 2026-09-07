@@ -9,88 +9,47 @@ client = TelegramClient(StringSession("1BVtsOJwBu49t0kwYRsMp3tbGg1Ulu0Vyxox-C5bM
 
 TARGET = "@dd28"
 history = []
-current_streak = []
-MAX_RECORDS = 20
 
 def unbold(text):
-    bold_map = {
-        '𝟬':'0','𝟭':'1','𝟮':'2','𝟯':'3','𝟰':'4','𝟱':'5',
-        '𝟲':'6','𝟳':'7','𝟴':'8','𝟵':'9'
-    }
-    for k, v in bold_map.items():
+    m = {'𝟬':'0','𝟭':'1','𝟮':'2','𝟯':'3','𝟰':'4','𝟱':'5','𝟲':'6','𝟳':'7','𝟴':'8','𝟵':'9'}
+    for k, v in m.items():
         text = text.replace(k, v)
     return text
 
-def parse_result(text):
+def parse(text):
     try:
         text = unbold(text)
-        issue_match = re.search(r'第(\d+)期', text)
-        if not issue_match:
+        iss = re.search(r'第(\d+)期', text)
+        if not iss:
             return None
-        issue_num = issue_match.group(1)
-        issue_last = int(issue_num[-1])
-        sum_match = re.search(r'(\d)\+(\d)\+(\d)=(\d+)', text)
-        if not sum_match:
+        last = int(iss.group(1)[-1])
+        sm = re.search(r'(\d)\+(\d)\+(\d)=', text)
+        if not sm:
             return None
-        a_ball = int(sum_match.group(1))
-        b_ball = int(sum_match.group(2))
-        return (issue_last, a_ball, b_ball)
+        return (last, int(sm.group(1)), int(sm.group(2)))
     except:
         return None
 
-def calc_value(history_list):
-    if len(history_list) < 3:
-        return None, "等够3期数据"
-    entry_3 = history_list[-3]
-    entry_2 = history_list[-2]
-    entry_1 = history_list[-1]
-    a_3 = entry_3[1]
-    b_2 = entry_2[2]
-    issue_last = entry_1[0]
-    value = (a_3 + b_2 + issue_last) % 10
-    kill = (value + 5) % 10
-    return value, kill
-
 @client.on(events.NewMessage(chats=TARGET))
-async def on_new_result(event):
-    global history, current_streak
-    parsed = parse_result(event.message.text)
-    if not parsed:
+async def handler(event):
+    global history
+    p = parse(event.message.text)
+    if not p:
         return
-    issue_last, a_ball, b_ball = parsed
-    history.append((issue_last, a_ball, b_ball))
-    if len(history) >= MAX_RECORDS:
+    history.append(p)
+    if len(history) < 3:
+        return
+    if len(history) > 20:
         history = history[-3:]
 
-    value, kill = calc_value(history)
-    if value is None:
-        return
+    a3 = history[-3][1]
+    b2 = history[-2][2]
+    last = history[-1][0]
+    val = (a3 + b2 + last) % 10
+    kill = (val + 5) % 10
 
-    latest_a = history[-1][1]
-    if latest_a == kill:
-        history = []
-        current_streak = []
-        result = "🍉 杀错！清空重来"
-    else:
-        current_streak.append(1)
-        result = f"🀄 命中！连中 {len(current_streak)}"
-
-    msg = (
-        f"📊 自动报数\n"
-        f"期号末位: {issue_last} | 开奖: {a_ball}+{b_ball}\n"
-        f"计算: 第3期a({history[-3][1]}) + 第2期b({history[-2][2]}) + 期号末位({issue_last}) = {history[-3][1]+history[-2][2]+issue_last} → value={value}\n"
-        f"🔪 杀: {kill}（反组合）\n"
-        f"{result}"
-    )
+    msg = f"📊 自动报数\nvalue={val}\n🔪 杀={kill}"
     await client.send_message(TARGET, msg)
-
-@client.on(events.NewMessage(pattern='/start'))
-async def start(event):
-    await event.respond('✅ 自动报数已启动，监听 @dd28 中...')
-
-@client.on(events.NewMessage(pattern='/status'))
-async def status(event):
-    await event.respond(f'📊 已记录 {len(history)} 期，连中 {len(current_streak)} 条')
 
 print("启动中...")
 client.start()
