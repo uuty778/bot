@@ -21,6 +21,7 @@ client = TelegramClient(StringSession(session_str), api_id, api_hash)
 @client.on(events.NewMessage(chats=TARGET))
 async def handler(event):
     global history
+    print("收到消息:", event.message.text[:50] if event.message.text else "无文本")
     text = event.message.text
     if not text:
         return
@@ -29,23 +30,29 @@ async def handler(event):
 
     pm = re.search(r'第(\d+)期', text)
     if not pm:
+        print("没匹配到期号")
         return
     cur_period = pm.group(1)
+    print(f"期号: {cur_period}")
 
     om = re.search(r'开(\d+)', text)
     if not om:
+        print("没匹配到开奖")
         return
     opened = int(om.group(1))
     tail = opened % 10
+    print(f"开奖: {opened} 尾数: {tail}")
 
     sm = re.search(r'(\d)\+(\d)\+(\d)=', text)
     if not sm:
+        print("没匹配到a+b+c")
         return
     a = int(sm.group(1))
     b = int(sm.group(2))
     c = int(sm.group(3))
+    print(f"a={a} b={b} c={c}")
 
-    # 判断上期挂没挂（用上上期杀号 vs 本期开奖）
+    # 判断上期
     hit = True
     if len(history) >= 2 and len(history[-2]) >= 5:
         prev_kill = history[-2][4]
@@ -54,12 +61,14 @@ async def handler(event):
         opened_ss = ("大" if o_big else "小") + ("单" if o_odd else "双")
         if opened_ss == prev_kill:
             hit = False
+        print(f"上期杀{prev_kill} 本期开{opened_ss} {'挂' if not hit else '中'}")
 
     # 挂了清空
     if not hit:
         history.clear()
+        print("挂了，清空")
 
-    # 记录本期
+    # 记录
     history.append([c, a, b])
     if len(history) > 3:
         history = history[-3:]
@@ -67,13 +76,14 @@ async def handler(event):
     while len(history) < 3:
         history.insert(0, [0, 0, 0])
 
-    # 算法：第3期a + 第2期b + 最新期末位
+    # 算法
     a3 = history[-3][1]
     b2 = history[-2][2]
     cur = history[-1][0]
     val = (a3 + b2 + cur) % 10
 
     kill_ss = ("小" if val >= 5 else "大") + ("双" if val % 2 == 1 else "单")
+    print(f"算法: a3={a3} b2={b2} cur={cur} val={val} 杀{kill_ss}")
 
     history[-1].append(kill_ss)
 
@@ -88,7 +98,10 @@ async def handler(event):
 
     # 发
     emoji = "🀄" if hit else "🍉"
-    await client.send_message(TARGET, f"第{cur_period}期杀{kill_ss} {shuangzu}{emoji}{opened}")
+    msg = f"第{cur_period}期杀{kill_ss} {shuangzu}{emoji}{opened}"
+    print(f"准备发送: {msg}")
+    await client.send_message(TARGET, msg)
+    print("发送完成")
 
 print("启动中...")
 client.start()
