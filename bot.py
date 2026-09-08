@@ -8,6 +8,8 @@ session_str = "1BVtsOIQBuw7QWchMeY2sYsPhrP9oLEDQRinT871ThXkDyT5A9LcTV0k_cecG3sgf
 
 TARGET = "@dd28"
 history = []
+results = []
+WINDOW = 10
 
 bold_map = {
     '𝟬': '0', '𝟭': '1', '𝟮': '2', '𝟯': '3', '𝟰': '4',
@@ -26,10 +28,12 @@ def parse(text):
         return None
     num = int(iss.group(1))
     last = int(str(num)[-1])
+    open_sm = re.search(r'=(\d+)', text)
+    open_num = int(open_sm.group(1)) if open_sm else None
     sm = re.search(r'(\d)\+(\d)\+(\d)=', text)
     if not sm:
         return None
-    return (num, last, int(sm.group(1)), int(sm.group(2)))
+    return (num, last, int(sm.group(1)), int(sm.group(2)), open_num)
 
 def get_type(n):
     if n <= 4:
@@ -42,6 +46,15 @@ def get_type(n):
         parity = '单'
     return size + parity
 
+def calc(h):
+    a3 = h[-3][2]
+    b2 = h[-2][3]
+    curr_num = h[-1][0]
+    curr_last = h[-1][1]
+    val = (a3 + b2 + curr_last) % 10
+    杀号 = (10 - val) % 10
+    return get_type(杀号)
+
 client = TelegramClient(StringSession(session_str), api_id, api_hash)
 
 @client.on(events.NewMessage(pattern='/start'))
@@ -50,26 +63,44 @@ async def start(event):
 
 @client.on(events.NewMessage(chats=TARGET))
 async def handler(event):
-    global history
+    global history, results
     p = parse(event.message.text)
     if not p:
         return
+    if history and history[-1][0] == p[0]:
+        return
+
     history.append(p)
     if len(history) < 4:
         return
-    if len(history) > 20:
-        history = history[-4:]
 
-    a3 = history[-3][2]
-    b2 = history[-2][3]
-    curr_num = history[-1][0]
-    curr_last = history[-1][1]
+    # 算本期预测（预测下一期）
+    pred_num = p[0] + 1
+    pred_type = calc(history)
+    results.append((pred_num, pred_type))
 
-    val = (a3 + b2 + curr_last) % 10
-    杀号 = (10 - val) % 10
-    杀型 = get_type(杀号)
+    # 满了WINDOW就断开，从下一期重新开始
+    if len(results) >= WINDOW:
+        send_results = results[:WINDOW]
+        results = []   # 清空，下一期重新叠
+        history = history[-3:]  # 保留最近3期数据，供下次计算用
+    else:
+        send_results = results
 
-    msg = f"第{curr_num + 1}期：杀{杀型}"
+    # 组装带开奖结果
+    lines = []
+    for pred_num_i, pred_type_i in send_results:
+        open_result = None
+        for rec in history:
+            if rec[0] == pred_num_i and rec[4] is not None:
+                open_result = rec[4]
+                break
+        if open_result is not None:
+            lines.append(f"第{pred_num_i}期：杀{pred_type_i}🀄开{open_result}")
+        else:
+            lines.append(f"第{pred_num_i}期：杀{pred_type_i}")
+
+    msg = "\n".join(lines)
     await client.send_message(TARGET, msg)
 
 print("启动中...")
