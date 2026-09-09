@@ -27,24 +27,27 @@ def parse(text):
     if not iss:
         return None
     num = int(iss.group(1))
-    last = int(str(num)[-1])
-    open_sm = re.search(r'=(\d+)', text)
+    open_sm = re.search(r'\d\+\d\+\d=(\d+)', text)
     open_num = int(open_sm.group(1)) if open_sm else None
     sm = re.search(r'(\d)\+(\d)\+(\d)=', text)
     if not sm:
         return None
-    return (num, last, int(sm.group(1)), int(sm.group(2)), open_num)
+    last = int(str(num)[-1])
+    a = int(sm.group(1))
+    b = int(sm.group(2))
+    return (num, last, a, b, open_num)
+
+SMALL_ODD  = {1,3,5,7,9,11,13}
+SMALL_EVEN = {0,2,4,6,8,10,12}
+BIG_EVEN   = {14,16,18,20,22,24,26}
+BIG_ODD    = {15,17,19,21,23,25,27}
 
 def get_type(n):
-    if n <= 4:
-        size = '小'
-    else:
-        size = '大'
-    if n % 2 == 0:
-        parity = '双'
-    else:
-        parity = '单'
-    return size + parity
+    if n in SMALL_ODD:  return '小单'
+    if n in SMALL_EVEN: return '小双'
+    if n in BIG_EVEN:   return '大双'
+    if n in BIG_ODD:    return '大单'
+    return ('大' if n >= 14 else '小') + ('双' if n % 2 == 0 else '单')
 
 def calc(h):
     a3 = h[-3][2]
@@ -74,20 +77,17 @@ async def handler(event):
     if len(history) < 4:
         return
 
-    # 算本期预测（预测下一期）
     pred_num = p[0] + 1
     pred_type = calc(history)
     results.append((pred_num, pred_type))
 
-    # 满了WINDOW就断开，从下一期重新开始
     if len(results) >= WINDOW:
         send_results = results[:WINDOW]
-        results = []   # 清空，下一期重新叠
-        history = history[-3:]  # 保留最近3期数据，供下次计算用
+        results = []
+        history = history[-3:]
     else:
         send_results = results
 
-    # 组装带开奖结果
     lines = []
     for pred_num_i, pred_type_i in send_results:
         open_result = None
@@ -95,10 +95,13 @@ async def handler(event):
             if rec[0] == pred_num_i and rec[4] is not None:
                 open_result = rec[4]
                 break
+        line = f"第{pred_num_i}期：杀{pred_type_i}"
         if open_result is not None:
-            lines.append(f"第{pred_num_i}期：杀{pred_type_i}🀄开{open_result}")
-        else:
-            lines.append(f"第{pred_num_i}期：杀{pred_type_i}")
+            if get_type(open_result) == pred_type_i:
+                line += "🍉"
+            else:
+                line += f"🀄开{open_result}"
+        lines.append(line)
 
     msg = "\n".join(lines)
     await client.send_message(TARGET, msg)
