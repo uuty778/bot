@@ -83,18 +83,17 @@ def build_line(pred_num, pred_type, double_group, history):
         if rec[0] == pred_num and rec[4] is not None:
             open_result = rec[4]
             break
-    double_str = double_group[0] + double_group[1]
     if open_result is None:
-        return short_num + "期杀" + pred_type + " " + double_str
+        return short_num + "期杀" + pred_type
     combo = getCombination(open_result)
     if combo == pred_type:
-        tail = "🍉杀" + str(open_result)
+        tail = "🍉" + str(open_result)
     else:
         if combo in double_group:
-            tail = "🀄组" + str(open_result)
+            tail = "🀄" + str(open_result)
         else:
-            tail = "🀄杀" + str(open_result)
-    return short_num + "期杀" + pred_type + " " + double_str + tail
+            tail = "🀄" + str(open_result)
+    return short_num + "期杀" + pred_type + tail
 
 client = TelegramClient(StringSession(session_str), api_id, api_hash)
 
@@ -118,27 +117,19 @@ async def handler(event):
     if len(history) > 30:
         history = history[-30:]
 
-    should_clear = False
-    if p[4] is not None:
-        for pred_num_i, pred_type_i, double_i in list(results):
-            if pred_num_i == p[0]:
-                combo = getCombination(p[4])
-                if combo == pred_type_i:
-                    should_clear = True
-                break
-
     pred_num = p[0] + 1
     res = predict(history)
     if res is None:
         return
     pred_type, double_group = res
 
-    if should_clear:
-        results = []
-        results.append((pred_num, pred_type, double_group))
+    results.append((pred_num, pred_type, double_group))
+
+    # 叠到10层就清空，只发最新这一条
+    if len(results) >= 10:
+        results = [(pred_num, pred_type, double_group)]
         await client.send_message(TARGET, build_line(pred_num, pred_type, double_group, history))
     else:
-        results.append((pred_num, pred_type, double_group))
         lines = [build_line(pred_num_i, pred_type_i, double_i, history) for (pred_num_i, pred_type_i, double_i) in results]
         await client.send_message(TARGET, "\n".join(lines))
 
