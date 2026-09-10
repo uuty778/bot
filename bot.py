@@ -1,6 +1,12 @@
+import asyncio
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
 import re
+import logging
+
+# 抑制第三方库日志，避免乱码写入 stdout
+logging.basicConfig(level=logging.WARNING)
+logging.getLogger('telethon').setLevel(logging.ERROR)
 
 api_id = 26048878
 api_hash = "735a5e369c70f328eab9ad3c52c3b5cf"
@@ -106,6 +112,10 @@ async def handler(event):
     msg = "\n".join(lines)
     await client.send_message(TARGET, msg)
 
-print("启动中...")
-client.start()
-client.run_until_disconnected()
+async def main():
+    await client.start()
+    print("已连接，等待消息...")
+    await client.run_until_disconnected()
+
+if __name__ == '__main__':
+    asyncio.run(main())
