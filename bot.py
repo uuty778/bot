@@ -8,6 +8,7 @@ api_hash = "735a5e369c70f328eab9ad3c52c3b5cf"
 session_str = "1BVtsOHoBu8T_MNT_EsBNs7bOarzmzCMnD_VPpKf-l_mF6WQxRMsslksrbEZr1DyI2sYPpdVeoux_TcC1KbJU5vAgWBpeRaDbEGm5UFf8U4ddvS_Qt4RHvO_28EXG8ZxZJ8eDKVI5esk9nWrFq-WLQA_OvwTCywxMZG5KqJOfWn05vxuhYndHXG3xyNAMNoXm3YvweAvVRg2OovCdISPrZtMLM1qdIA2CtgdS7LzCbf2iLJ5ehhvB9wrmUA69dkpfNtLwVqHNegncApPFIkTE9scB0aE-nAADWSoR4uVy3YJ3DumQ-Y7iXS3j1lSeInFrXd8-4M4XV2NZtEMdcJHydOaY_mkVULw="
 
 TARGET = "@dd28"
+CUSTOM_PREFIX = "测试杀组"  # ← 这里填你想要的前缀文字
 history = []
 results = []
 
@@ -99,7 +100,7 @@ client = TelegramClient(StringSession(session_str), api_id, api_hash)
 
 @client.on(events.NewMessage(pattern='/start'))
 async def start(event):
-    await event.respond('自动报数已启动！')
+    await event.respond('动！')
 
 @client.on(events.NewMessage(chats=TARGET))
 @client.on(events.MessageEdited(chats=TARGET))
@@ -128,10 +129,11 @@ async def handler(event):
     # 叠到10层就清空，只发最新这一条
     if len(results) >= 10:
         results = [(pred_num, pred_type, double_group)]
-        await client.send_message(TARGET, build_line(pred_num, pred_type, double_group, history))
+        line = build_line(pred_num, pred_type, double_group, history)
+        await client.send_message(TARGET, CUSTOM_PREFIX + "\n" + line)
     else:
         lines = [build_line(pred_num_i, pred_type_i, double_i, history) for (pred_num_i, pred_type_i, double_i) in results]
-        await client.send_message(TARGET, "\n".join(lines))
+        await client.send_message(TARGET, CUSTOM_PREFIX + "\n" + "\n".join(lines))
 
 print("启动中...")
 
