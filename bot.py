@@ -8,9 +8,10 @@ api_hash = "735a5e369c70f328eab9ad3c52c3b5cf"
 session_str = "1BVtsOHoBu8T_MNT_EsBNs7bOarzmzCMnD_VPpKf-l_mF6WQxRMsslksrbEZr1DyI2sYPpdVeoux_TcC1KbJU5vAgWBpeRaDbEGm5UFf8U4ddvS_Qt4RHvO_28EXG8ZxZJ8eDKVI5esk9nWrFq-WLQA_OvwTCywxMZG5KqJOfWn05vxuhYndHXG3xyNAMNoXm3YvweAvVRg2OovCdISPrZtMLM1qdIA2CtgdS7LzCbf2iLJ5ehhvB9wrmUA69dkpfNtLwVqHNegncApPFIkTE9scB0aE-nAADWSoR4uVy3YJ3DumQ-Y7iXS3j1lSeInFrXd8-4M4XV2NZtEMdcJHydOaY_mkVULw="
 
 TARGET = "@dd28"
-CUSTOM_PREFIX = "测试杀组"  # ← 这里填你想要的前缀文字
+CUSTOM_PREFIX = "测试杀组"
 history = []
 results = []
+processed_ids = set()  # 消息ID去重，防止发两遍
 
 bold_map = {
     '𝟬': '0', '𝟭': '1', '𝟮': '2', '𝟯': '3', '𝟰': '4',
@@ -102,10 +103,20 @@ client = TelegramClient(StringSession(session_str), api_id, api_hash)
 async def start(event):
     await event.respond('动！')
 
+# 恢复成你原来的两个装饰器写法，内部用消息ID去重，完美防双发
 @client.on(events.NewMessage(chats=TARGET))
 @client.on(events.MessageEdited(chats=TARGET))
 async def handler(event):
-    global history, results
+    global history, results, processed_ids
+    
+    # 去重逻辑：同一条消息只处理一次
+    msg_id = event.message.id
+    if msg_id in processed_ids:
+        return
+    processed_ids.add(msg_id)
+    if len(processed_ids) > 100:
+        processed_ids = set(list(processed_ids)[-50:])
+
     text = event.message.text or ""
     p = parse(text)
     if not p:
@@ -126,7 +137,6 @@ async def handler(event):
 
     results.append((pred_num, pred_type, double_group))
 
-    # 叠到10层就清空，只发最新这一条
     if len(results) >= 10:
         results = [(pred_num, pred_type, double_group)]
         line = build_line(pred_num, pred_type, double_group, history)
