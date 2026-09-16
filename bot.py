@@ -5,10 +5,10 @@ import sys
 
 api_id = 26048878
 api_hash = "735a5e369c70f328eab9ad3c52c3b5cf"
-session_str = "1BVtsOHIBu1w7v6fASx_HZx72k1_eRxFX0z0TWdAmxyqZvxX7N3rG6unD5arw-wQ3PAY1EfZepoRPH6kx1c9cyVYdlmJQp_V5jdipII2EInXh0XVaJoW9L2Uz_HMjrqx1_PgmavepqMl043kuBn34dV_1m76Vx7nLgdpfIwYRTrcmkbX8dbqmxlET9GMCceHowQqweKTU7euTCnA5Vu1B8EoYI1HsEdnjog6pj2W-xq21vvb6dQ3uNFv08H-3_gU7FRbG9TgwizS1W9kFGGrl6nSBJj0T59AubQw2iMBzwKI-DElv5S-0D05R_S2LY6jRjUckCt-E7HuzHC5hJdJE_D4auMMQmtw="
+session_str = "1BVtsOIUBu1EfT-ycSL5Tl-TFNXd50bYfHJeLbXOxD7_szD0Rf-YU1hxhgvntDTW5FW8KptkEGsH8ubUcKK563U8lSkxuxj-0fGqAFj_5s69BNn86Yf05mkrL4XBHXgmR5YGczswpBWZqj5E-imonIggO4OVFcsrGElQrPw7Se-eClIgpd9G09rEKR4l6R2lIOad2ChbuBtCfS3M_yAt35hfejLaiZ_wE3P30Egmq6U6nkVcEpzF18JXc85Vjnru5-Plnl5h8X5vQJHOoQII7Z_V6HnMbFhSocMda_EZ255-r2_Hx4PNNV9TQnCVzGkuKGV15zxB_S23zg093N67P0rGDG6yu67k="
 
 TARGET = "@dd28"
-CUSTOM_PREFIX = "测试杀组"
+CUSTOM_PREFIX = "好饿"
 history = []
 results = []
 processed_ids = set()  # 消息ID去重，防止发两遍
