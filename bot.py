@@ -11,7 +11,7 @@ TARGET = "@dd28"
 CUSTOM_PREFIX = "好饿"
 history = []
 results = []
-processed_ids = set()  # 消息ID去重，防止发两遍
+processed_ids = set()
 
 bold_map = {
     '𝟬': '0', '𝟭': '1', '𝟮': '2', '𝟯': '3', '𝟰': '4',
@@ -40,6 +40,7 @@ def parse(text):
     return (num, a, b, c, open_num)
 
 def getCombination(total):
+    """根据总和值返回类型"""
     if total in (1, 3, 5, 7, 9, 11, 13):
         return '小单'
     elif total in (0, 2, 4, 6, 8, 10, 12):
@@ -50,32 +51,67 @@ def getCombination(total):
         return '大单'
     return '小单'
 
+def getOpposite(combo_type):
+    """返回相反类型"""
+    opposite_map = {
+        '小单': '大双',
+        '大双': '小单',
+        '小双': '大单',
+        '大单': '小双'
+    }
+    return opposite_map.get(combo_type, '小单')
+
 def predict(history):
+    """
+    新算法：
+    取最近三期（不足三期用0凑）的A、B、C球分别累加
+    然后 A_total + B_total + C_total = final_sum
+    如果 final_sum > 27，则 final_sum - 27
+    用 final_sum 对应的组合类型，杀「相反」类型
+    """
     if len(history) < 1:
         return None
-    latest = history[-1]
-    a, c, open_num = latest[1], latest[3], latest[4]
-    if open_num is None:
-        return None
-
-    val = a + c + (open_num % 10)
-
-    if val in (1, 3, 5, 7, 9, 11, 13):
-        kill_type = '大双'
+    
+    # 取最近三期，不足三期用0填充
+    recent = history[-3:] if len(history) >= 3 else history
+    
+    # 分别累加A、B、C
+    a_total = 0
+    b_total = 0
+    c_total = 0
+    
+    for rec in recent:
+        # rec格式: (num, a, b, c, open_num)
+        a_total += rec[1]
+        b_total += rec[2]
+        c_total += rec[3]
+    
+    # 如果不足三期，用0凑够三期
+    # 比如只有2期，就需要补1期的0,0,0
+    # 只有1期，补2期的0,0,0
+    if len(recent) < 3:
+        # 补 (3 - len(recent)) 期的 0 值
+        pass  # a_total/b_total/c_total 已经是实际值，相当于0已经默认加了
+    
+    final_sum = a_total + b_total + c_total
+    
+    # 超出27就减27（循环取模，但按你的规则是减27）
+    while final_sum > 27:
+        final_sum -= 27
+    
+    # 如果 final_sum 是 0，对应小双（按getCombination逻辑）
+    # 但0也可能出现，正常处理
+    
+    combo = getCombination(final_sum)
+    kill_type = getOpposite(combo)
+    
+    # double_group 保持原来的逻辑（用于展示🀄/🍉标记）
+    # 杀类型对应的双组
+    if kill_type in ('小单', '大双'):
         double_group = ['小双', '大单']
-    elif val in (0, 2, 4, 6, 8, 10, 12):
-        kill_type = '大单'
-        double_group = ['小单', '大双']
-    elif val in (14, 16, 18, 20, 22, 24, 26):
-        kill_type = '小单'
-        double_group = ['小双', '大单']
-    elif val in (15, 17, 19, 21, 23, 25, 27):
-        kill_type = '小双'
-        double_group = ['小单', '大双']
     else:
-        kill_type = '大双'
-        double_group = ['小双', '大单']
-
+        double_group = ['小单', '大双']
+    
     return kill_type, double_group
 
 def build_line(pred_num, pred_type, double_group, history):
@@ -103,13 +139,11 @@ client = TelegramClient(StringSession(session_str), api_id, api_hash)
 async def start(event):
     await event.respond('动！')
 
-# 恢复成你原来的两个装饰器写法，内部用消息ID去重，完美防双发
 @client.on(events.NewMessage(chats=TARGET))
 @client.on(events.MessageEdited(chats=TARGET))
 async def handler(event):
     global history, results, processed_ids
     
-    # 去重逻辑：同一条消息只处理一次
     msg_id = event.message.id
     if msg_id in processed_ids:
         return
