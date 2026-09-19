@@ -2,16 +2,20 @@ from telethon import TelegramClient, events, sync
 from telethon.sessions import StringSession
 import re
 import sys
+import asyncio
+import traceback
 
 api_id = 26048878
 api_hash = "735a5e369c70f328eab9ad3c52c3b5cf"
-session_str = "1BVtsOIUBu1EfT-ycSL5Tl-TFNXd50bYfHJeLbXOxD7_szD0Rf-YU1hxhgvntDTW5FW8KptkEGsH8ubUcKK563U8lSkxuxj-0fGqAFj_5s69BNn86Yf05mkrL4XBHXgmR5YGczswpBWZqj5E-imonIggO4OVFcsrGElQrPw7Se-eClIgpd9G09rEKR4l6R2lIOad2ChbuBtCfS3M_yAt35hfejLaiZ_wE3P30Egmq6U6nkVcEpzF18JXc85Vjnru5-Plnl5h8X5vQJHOoQII7Z_V6HnMbFhSocMda_EZ255-r2_Hx4PNNV9TQnCVzGkuKGV15zxB_S23zg093N67P0rGDG6yu67k="
+session_str = "1BVtsOHoBu5MbGm98Rv140gp0laHA07NFteroxb9NQIScOU8Y8YYofqsPJ25K22PqDaY1f30nVkdHvcIGNpDdFzvl6bmrDNoYrkKsQuY7n6h-fvP69qLQobcYTbeUbxSiAlLcw1XZN1Gvx6m5Cr1O_f-MU7ZD_pld8NGX6decCj5RKZcvGrC1LhOBFGAcJ-I52TUkUx6pJtfNFwbzGWLJep0IM0PuDpZF5zRwj57yVqbXn4zhatgylKy7iTR8urJAG34btb3ISHHlSWCpJb0LL3JvfdgzZVgQkzGiNsbQXUCRiwpJ_ylEZ3PI2Pu_pk8xIWNaDYTvt9ryniVWrIbrBlU2HtMG0rU="
 
-TARGET = "@dd28"
-CUSTOM_PREFIX = "好饿"
+TARGET = "@er888"
+CUSTOM_PREFIX = "测试中"
 history = []
 results = []
 processed_ids = set()
+
+DELAY_SECONDS = 30
 
 bold_map = {
     '𝟬': '0', '𝟭': '1', '𝟮': '2', '𝟯': '3', '𝟰': '4',
@@ -21,26 +25,33 @@ bold_map = {
 def unbold(text):
     for k, v in bold_map.items():
         text = text.replace(k, v)
+    text = text.replace('**', '')
     return text
 
 def parse(text):
     text = unbold(text)
-    iss = re.search(r'第(\d+)期', text)
+
+    iss = re.search(r'第\**\s*(\d{4,})\s*\**期', text)
     if not iss:
+        iss = re.search(r'(\d{6,})', text)
+    if not iss:
+        print(f"[PARSE] ❌ 没找到期号。文本片段: {text[:120]}")
         return None
     num = int(iss.group(1))
-    sm = re.search(r'(\d)\s*[+＋]\s*(\d)\s*[+＋]\s*(\d)\s*=', text)
+
+    sm = re.search(r'(\d)\s*[+＋]\s*(\d)\s*[+＋]\s*(\d)\s*=\s*(\d+)', text)
     if not sm:
+        print(f"[PARSE] ❌ 没匹配到 a+b+c=d。文本: {text[:150]}")
         return None
     a = int(sm.group(1))
     b = int(sm.group(2))
     c = int(sm.group(3))
-    open_sm = re.search(r'=\s*(\d+)', text)
-    open_num = int(open_sm.group(1)) if open_sm else None
+    open_num = int(sm.group(4))
+
+    print(f"[PARSE] ✅ 第{num}期 A={a} B={b} C={c} 开奖={open_num}")
     return (num, a, b, c, open_num)
 
 def getCombination(total):
-    """根据总和值返回类型"""
     if total in (1, 3, 5, 7, 9, 11, 13):
         return '小单'
     elif total in (0, 2, 4, 6, 8, 10, 12):
@@ -52,7 +63,6 @@ def getCombination(total):
     return '小单'
 
 def getOpposite(combo_type):
-    """返回相反类型"""
     opposite_map = {
         '小单': '大双',
         '大双': '小单',
@@ -62,56 +72,21 @@ def getOpposite(combo_type):
     return opposite_map.get(combo_type, '小单')
 
 def predict(history):
-    """
-    新算法：
-    取最近三期（不足三期用0凑）的A、B、C球分别累加
-    然后 A_total + B_total + C_total = final_sum
-    如果 final_sum > 27，则 final_sum - 27
-    用 final_sum 对应的组合类型，杀「相反」类型
-    """
     if len(history) < 1:
         return None
-    
-    # 取最近三期，不足三期用0填充
     recent = history[-3:] if len(history) >= 3 else history
-    
-    # 分别累加A、B、C
-    a_total = 0
-    b_total = 0
-    c_total = 0
-    
-    for rec in recent:
-        # rec格式: (num, a, b, c, open_num)
-        a_total += rec[1]
-        b_total += rec[2]
-        c_total += rec[3]
-    
-    # 如果不足三期，用0凑够三期
-    # 比如只有2期，就需要补1期的0,0,0
-    # 只有1期，补2期的0,0,0
-    if len(recent) < 3:
-        # 补 (3 - len(recent)) 期的 0 值
-        pass  # a_total/b_total/c_total 已经是实际值，相当于0已经默认加了
-    
+    a_total = sum(rec[1] for rec in recent)
+    b_total = sum(rec[2] for rec in recent)
+    c_total = sum(rec[3] for rec in recent)
     final_sum = a_total + b_total + c_total
-    
-    # 超出27就减27（循环取模，但按你的规则是减27）
     while final_sum > 27:
         final_sum -= 27
-    
-    # 如果 final_sum 是 0，对应小双（按getCombination逻辑）
-    # 但0也可能出现，正常处理
-    
     combo = getCombination(final_sum)
     kill_type = getOpposite(combo)
-    
-    # double_group 保持原来的逻辑（用于展示🀄/🍉标记）
-    # 杀类型对应的双组
     if kill_type in ('小单', '大双'):
         double_group = ['小双', '大单']
     else:
         double_group = ['小单', '大双']
-    
     return kill_type, double_group
 
 def build_line(pred_num, pred_type, double_group, history):
@@ -127,11 +102,23 @@ def build_line(pred_num, pred_type, double_group, history):
     if combo == pred_type:
         tail = "🍉" + str(open_result)
     else:
-        if combo in double_group:
-            tail = "🀄" + str(open_result)
-        else:
-            tail = "🀄" + str(open_result)
+        tail = "🀄" + str(open_result)
     return short_num + "期杀" + pred_type + tail
+
+def check_last_result(history, pred_num_for_current):
+    target_num = pred_num_for_current
+    for rec in history:
+        if rec[0] == target_num and rec[4] is not None:
+            open_num = rec[4]
+            combo = getCombination(open_num)
+            for (pn, pt, dg) in list(results):
+                if pn == target_num:
+                    if combo == pt:
+                        return '🍉'
+                    else:
+                        return '🀄'
+            return None
+    return None
 
 client = TelegramClient(StringSession(session_str), api_id, api_hash)
 
@@ -139,11 +126,36 @@ client = TelegramClient(StringSession(session_str), api_id, api_hash)
 async def start(event):
     await event.respond('动！')
 
+async def delayed_send(pred_num, pred_type, double_group, history_snapshot):
+    try:
+        await asyncio.sleep(DELAY_SECONDS)
+
+        global results
+
+        last_status = check_last_result(history_snapshot, pred_num)
+        if last_status == '🍉':
+            results.clear()
+
+        results.append((pred_num, pred_type, double_group))
+
+        if len(results) == 1:
+            line = build_line(pred_num, pred_type, double_group, history_snapshot)
+            await client.send_message(TARGET, CUSTOM_PREFIX + "\n" + line)
+        else:
+            lines = [build_line(pn, pt, dg, history_snapshot) for (pn, pt, dg) in results]
+            await client.send_message(TARGET, CUSTOM_PREFIX + "\n" + "\n".join(lines))
+
+        print(f"[SEND] ✅ 第{pred_num}期 发送成功")
+
+    except Exception as e:
+        print(f"[SEND] ❌ 发送失败: {e}")
+        traceback.print_exc()
+
 @client.on(events.NewMessage(chats=TARGET))
 @client.on(events.MessageEdited(chats=TARGET))
 async def handler(event):
-    global history, results, processed_ids
-    
+    global history, processed_ids
+
     msg_id = event.message.id
     if msg_id in processed_ids:
         return
@@ -169,15 +181,13 @@ async def handler(event):
         return
     pred_type, double_group = res
 
-    results.append((pred_num, pred_type, double_group))
+    history_snapshot = list(history)
 
-    if len(results) >= 10:
-        results = [(pred_num, pred_type, double_group)]
-        line = build_line(pred_num, pred_type, double_group, history)
-        await client.send_message(TARGET, CUSTOM_PREFIX + "\n" + line)
-    else:
-        lines = [build_line(pred_num_i, pred_type_i, double_i, history) for (pred_num_i, pred_type_i, double_i) in results]
-        await client.send_message(TARGET, CUSTOM_PREFIX + "\n" + "\n".join(lines))
+    asyncio.create_task(
+        delayed_send(pred_num, pred_type, double_group, history_snapshot)
+    )
+
+    print(f"[HANDLER] ✅ 已创建延迟任务，预测第{pred_num}期 杀{pred_type}")
 
 print("启动中...")
 
@@ -185,11 +195,12 @@ with client:
     try:
         client.connect()
         if not client.is_user_authorized():
-            print("session 未授权！")
+            print("❌ session 未授权！")
             sys.exit(1)
         me = client.get_me()
-        print("登录成功: " + me.first_name + " @" + me.username)
+        print(f"✅ 登录成功: {me.first_name} @{me.username}")
+        print(f"✅ 开始监听 {TARGET} ...\n")
     except Exception as e:
-        print("失败: " + str(e))
+        print(f"❌ 连接失败: {e}")
         sys.exit(1)
     client.run_until_disconnected()
