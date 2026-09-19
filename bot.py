@@ -10,7 +10,7 @@ api_hash = "735a5e369c70f328eab9ad3c52c3b5cf"
 session_str = "1BVtsOHoBu5MbGm98Rv140gp0laHA07NFteroxb9NQIScOU8Y8YYofqsPJ25K22PqDaY1f30nVkdHvcIGNpDdFzvl6bmrDNoYrkKsQuY7n6h-fvP69qLQobcYTbeUbxSiAlLcw1XZN1Gvx6m5Cr1O_f-MU7ZD_pld8NGX6decCj5RKZcvGrC1LhOBFGAcJ-I52TUkUx6pJtfNFwbzGWLJep0IM0PuDpZF5zRwj57yVqbXn4zhatgylKy7iTR8urJAG34btb3ISHHlSWCpJb0LL3JvfdgzZVgQkzGiNsbQXUCRiwpJ_ylEZ3PI2Pu_pk8xIWNaDYTvt9ryniVWrIbrBlU2HtMG0rU="
 
 TARGET = "@er888"
-CUSTOM_PREFIX = "测试中"
+CUSTOM_PREFIX = "测试"
 history = []
 results = []
 processed_ids = set()
@@ -105,21 +105,6 @@ def build_line(pred_num, pred_type, double_group, history):
         tail = "🀄" + str(open_result)
     return short_num + "期杀" + pred_type + tail
 
-def check_last_result(history, pred_num_for_current):
-    target_num = pred_num_for_current
-    for rec in history:
-        if rec[0] == target_num and rec[4] is not None:
-            open_num = rec[4]
-            combo = getCombination(open_num)
-            for (pn, pt, dg) in list(results):
-                if pn == target_num:
-                    if combo == pt:
-                        return '🍉'
-                    else:
-                        return '🀄'
-            return None
-    return None
-
 client = TelegramClient(StringSession(session_str), api_id, api_hash)
 
 @client.on(events.NewMessage(pattern='/start'))
@@ -132,20 +117,31 @@ async def delayed_send(pred_num, pred_type, double_group, history_snapshot):
 
         global results
 
-        last_status = check_last_result(history_snapshot, pred_num)
-        if last_status == '🍉':
+        should_clear = False
+        if results and history_snapshot:
+            last_pred_num, last_pred_type, last_double_group = results[-1]
+            for rec in history_snapshot:
+                if rec[0] == last_pred_num and rec[4] is not None:
+                    open_num = rec[4]
+                    combo = getCombination(open_num)
+                    print(f"[CHECK] 第{last_pred_num}期开奖={open_num} combo={combo} 杀{last_pred_type}")
+                    if combo == last_pred_type:
+                        print(f"[CHECK] 🍉 杀到了，清空")
+                        should_clear = True
+                    else:
+                        print(f"[CHECK] 🀄 没杀到，继续叠")
+                    break
+
+        if should_clear:
             results.clear()
 
         results.append((pred_num, pred_type, double_group))
 
-        if len(results) == 1:
-            line = build_line(pred_num, pred_type, double_group, history_snapshot)
-            await client.send_message(TARGET, CUSTOM_PREFIX + "\n" + line)
-        else:
-            lines = [build_line(pn, pt, dg, history_snapshot) for (pn, pt, dg) in results]
-            await client.send_message(TARGET, CUSTOM_PREFIX + "\n" + "\n".join(lines))
+        lines = [build_line(pn, pt, dg, history_snapshot) for (pn, pt, dg) in results]
+        msg = CUSTOM_PREFIX + "\n" + "\n".join(lines)
+        await client.send_message(TARGET, msg)
 
-        print(f"[SEND] ✅ 第{pred_num}期 发送成功")
+        print(f"[SEND] ✅ 第{pred_num}期 发送成功，当前共{len(results)}期叠加")
 
     except Exception as e:
         print(f"[SEND] ❌ 发送失败: {e}")
@@ -187,7 +183,7 @@ async def handler(event):
         delayed_send(pred_num, pred_type, double_group, history_snapshot)
     )
 
-    print(f"[HANDLER] ✅ 已创建延迟任务，预测第{pred_num}期 杀{pred_type}")
+    print(f"[HANDLER] ✅ 预测第{pred_num}期 杀{pred_type}")
 
 print("启动中...")
 
