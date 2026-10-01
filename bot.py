@@ -9,10 +9,10 @@ import json
 
 api_id = 26048878
 api_hash = "735a5e369c70f328eab9ad3c52c3b5cf"
-session_str = "1BVtsOHIBu3gEssUc9irbBC-w70gHKfOgYDhcm9lOJAsU-sR8cGHBIgcvqNBzjU9QGyOeySXx9wi_wQeVrnydm1NqjZM3zrgwjcx1bt59htsDlYz_T-3kQXPpl_bbEQ87k1EmR8AGZyK7j8x2L5I0O_Sbryvxzukpgts-2-RcXTDLC4syU6af-OVG-HSbKCoCTuu_ltyUhAIoeo21dpuKgF-vSGI0k7IFtSA5U6oEcWv21wyP4TlTpPuyQkwBvtrZCJNOaamx1TGo8DMJeTiF-hhpOJfVN7nks7HMyt9G9XzjeUztLTDPjmH-ur895O9NCyVUGRGTrJvuNR4srZcVk2Aka-epg1o="
+session_str = "1BVtsOHIBuxxetmAOL1A2yCgVEFCGP4n-v_qCeVm-lFy5hozEs7XEufB0lwmssbt_dEd3A3iXPTnCwTttU5w6OHwmANen29G3y0mF3zCrG-a2V2Lv76A9DjWFQXIdtdm4zNE5NAOnuAs7xR3E8m9yPYxVMJMDNxYIplAVcPuwpDY0-wMIB7sM0QTqIPBypSdT3yxGYG8ICQ1UJaoY_50lPThp6Ieg7uvrtab_Ggk4X7uOwt3iYYoXrLz2ck2GxF_CWxaTVl9vBjBTqFhm4ghCFv36jEp_PGGTm2OU5dG4AEj0IcV4xanNEe1EsMPFS20lNgccEf4t4xmLkqnIMPbAa8xm85lbQ7I="
 
 TARGET = "@qwpc8"
-CUSTOM_PREFIX = "神天降而来"
+CUSTOM_PREFIX = ""
 history = []
 results = []
 processed_ids = set()
